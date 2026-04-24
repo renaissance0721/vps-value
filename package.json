@@ -1,0 +1,24 @@
+{
+  "name": "vps-value",
+  "version": "0.1.0",
+  "description": "A minimal VPS cost tracker for Cloudflare Pages and D1.",
+  "license": "MIT",
+  "type": "module",
+  "private": false,
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "npm run typecheck && vite build",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.functions.json --noEmit",
+    "preview": "vite preview --host 0.0.0.0",
+    "pages:dev": "npm run build && wrangler pages dev dist",
+    "db:migrate:local": "wrangler d1 migrations apply vps-value --local",
+    "db:migrate:remote": "wrangler d1 migrations apply vps-value --remote",
+    "deploy": "npm run build && wrangler pages deploy dist"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "4.20260424.1",
+    "typescript": "6.0.3",
+    "vite": "8.0.10",
+    "wrangler": "4.85.0"
+  }
+}
