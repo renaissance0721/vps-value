@@ -280,12 +280,26 @@ async function listVps(env: Env, status: string): Promise<Response> {
   }
 
   const items = rows.map((row) => toDto(row, rates));
+  const summaryItems =
+    normalizedStatus === "inactive"
+      ? (await getRowsByStatus(env, "active")).map((row) => toDto(row, rates))
+      : items;
 
   return json({
     items,
-    summary: summarize(items),
+    summary: summarize(summaryItems),
     rates
   });
+}
+
+async function getRowsByStatus(env: Env, status: VpsStatus): Promise<VpsRow[]> {
+  const result = await env.DB.prepare(
+    "SELECT * FROM vps WHERE status = ? ORDER BY expires_at ASC, provider ASC"
+  )
+    .bind(status)
+    .all<VpsRow>();
+
+  return result.results ?? [];
 }
 
 async function getVpsDto(env: Env, id: string) {
