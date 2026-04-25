@@ -217,7 +217,8 @@ a {
 }
 
 .form-page {
-  width: min(420px, 100%);
+  width: min(720px, 100%);
+  margin: 0 auto;
 }
 
 .list-panel {
@@ -243,8 +244,8 @@ a {
 
 .vps-form {
   display: grid;
-  gap: 12px;
-  padding: 16px;
+  gap: 14px;
+  padding: 22px;
 }
 
 .form-row {
