@@ -4,6 +4,7 @@ type CycleUnit = "day" | "month" | "year";
 type CyclePreset = "week" | "month" | "quarter" | "half_year" | "year" | "two_year" | "three_year";
 type VpsStatus = "active" | "inactive";
 type StatusFilter = "active" | "inactive" | "all";
+type Route = { page: "home" } | { page: "form"; id: string | null };
 
 interface VpsItem {
   id: string;
@@ -143,6 +144,11 @@ const state: {
   editingId: null
 };
 
+window.addEventListener("hashchange", () => {
+  state.error = "";
+  render();
+});
+
 void init();
 
 async function init(): Promise<void> {
@@ -180,12 +186,13 @@ async function loadItems(): Promise<void> {
 }
 
 function render(): void {
-  const editingItem = state.editingId
-    ? state.items.find((item) => item.id === state.editingId) ?? null
+  const route = getRoute();
+  const editingItem = route.page === "form" && route.id
+    ? state.items.find((item) => item.id === route.id) ?? null
     : null;
 
   app.innerHTML = `
-    <main class="shell">
+    <main class="shell ${route.page === "home" ? "home-shell" : "form-shell"}">
       <header class="topbar">
         <div>
           <h1>VPS Value</h1>
@@ -195,38 +202,7 @@ function render(): void {
       </header>
 
       ${renderMessage()}
-      ${renderSummary()}
-
-      <section class="workspace">
-        <section class="panel form-panel">
-          <div class="panel-heading">
-            <h2>${editingItem ? "修改 VPS" : "新增 VPS"}</h2>
-          </div>
-          ${renderForm(editingItem)}
-        </section>
-
-        <section class="panel list-panel">
-          <div class="panel-heading list-heading">
-            <h2>记录</h2>
-            <div class="segmented" role="tablist" aria-label="筛选 VPS 状态">
-              ${(["active", "inactive", "all"] as StatusFilter[])
-                .map(
-                  (filter) => `
-                    <button
-                      class="${state.filter === filter ? "is-active" : ""}"
-                      type="button"
-                      data-filter="${filter}"
-                    >
-                      ${filterLabels[filter]}
-                    </button>
-                  `
-                )
-                .join("")}
-            </div>
-          </div>
-          ${renderTable()}
-        </section>
-      </section>
+      ${route.page === "home" ? `${renderSummary()}${renderHomePage()}` : renderFormPage(editingItem, route.id)}
 
       <footer class="footer">
         <span>汇率来源：</span>
@@ -290,6 +266,67 @@ function renderMessage(): string {
   }
 
   return pieces.join("");
+}
+
+function renderHomePage(): string {
+  return `
+    <section class="home-page">
+      <section class="panel list-panel">
+        <div class="panel-heading list-heading">
+          <h2>记录</h2>
+          <div class="list-tools">
+            <button id="new-vps" type="button">新增 VPS</button>
+            <div class="segmented" role="tablist" aria-label="筛选 VPS 状态">
+              ${(["active", "inactive", "all"] as StatusFilter[])
+                .map(
+                  (filter) => `
+                    <button
+                      class="${state.filter === filter ? "is-active" : ""}"
+                      type="button"
+                      data-filter="${filter}"
+                    >
+                      ${filterLabels[filter]}
+                    </button>
+                  `
+                )
+                .join("")}
+            </div>
+          </div>
+        </div>
+        <div class="list-scroll">
+          ${renderTable()}
+        </div>
+      </section>
+    </section>
+  `;
+}
+
+function renderFormPage(item: VpsItem | null, id: string | null): string {
+  if (id && !item) {
+    return `
+      <section class="form-page">
+        <section class="panel form-panel">
+          <div class="panel-heading">
+            <h2>修改 VPS</h2>
+            <button class="ghost" id="back-home" type="button">返回主页</button>
+          </div>
+          <div class="table-state">${state.loading ? "加载中..." : "未找到这条 VPS 记录"}</div>
+        </section>
+      </section>
+    `;
+  }
+
+  return `
+    <section class="form-page">
+      <section class="panel form-panel">
+        <div class="panel-heading">
+          <h2>${item ? "修改 VPS" : "新增 VPS"}</h2>
+          <button class="ghost" id="back-home" type="button">返回主页</button>
+        </div>
+        ${renderForm(item)}
+      </section>
+    </section>
+  `;
 }
 
 function renderSummary(): string {
@@ -507,7 +544,44 @@ function renderStatus(status: VpsStatus): string {
     : `<span class="status inactive">已停用</span>`;
 }
 
+function getRoute(): Route {
+  const hash = decodeURIComponent(location.hash.replace(/^#\/?/, ""));
+
+  if (hash === "new") {
+    return { page: "form", id: null };
+  }
+
+  if (hash.startsWith("edit/")) {
+    const id = hash.slice(5).trim();
+    return id ? { page: "form", id } : { page: "home" };
+  }
+
+  return { page: "home" };
+}
+
+function navigateToForm(id: string | null): void {
+  location.hash = id ? `#/edit/${encodeURIComponent(id)}` : "#/new";
+}
+
+function navigateHome(shouldRender = true): void {
+  if (location.hash) {
+    history.pushState("", document.title, `${location.pathname}${location.search}`);
+  }
+
+  if (shouldRender) {
+    render();
+  }
+}
+
 function bindEvents(): void {
+  document.querySelector<HTMLButtonElement>("#new-vps")?.addEventListener("click", () => {
+    navigateToForm(null);
+  });
+
+  document.querySelector<HTMLButtonElement>("#back-home")?.addEventListener("click", () => {
+    navigateHome();
+  });
+
   document.querySelector<HTMLFormElement>("#auth-form")?.addEventListener("submit", (event) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget as HTMLFormElement);
@@ -540,7 +614,7 @@ function bindEvents(): void {
   document.querySelector<HTMLButtonElement>("#cancel-edit")?.addEventListener("click", () => {
     state.editingId = null;
     state.notice = "";
-    render();
+    navigateHome();
   });
 
   document.querySelectorAll<HTMLButtonElement>("[data-filter]").forEach((button) => {
@@ -562,6 +636,8 @@ function bindEvents(): void {
 }
 
 async function saveVps(form: HTMLFormElement): Promise<void> {
+  const route = getRoute();
+  const editingId = route.page === "form" ? route.id : null;
   const formData = new FormData(form);
   const cycle = getCyclePreset(String(formData.get("cyclePreset") ?? "month"));
   const payload = {
@@ -578,13 +654,12 @@ async function saveVps(form: HTMLFormElement): Promise<void> {
   };
 
   try {
-    if (state.editingId) {
-      await apiFetch(`/api/vps/${encodeURIComponent(state.editingId)}`, {
+    if (editingId) {
+      await apiFetch(`/api/vps/${encodeURIComponent(editingId)}`, {
         method: "PATCH",
         body: JSON.stringify(payload)
       });
       state.notice = "VPS 已更新";
-      state.editingId = null;
     } else {
       await apiFetch("/api/vps", {
         method: "POST",
@@ -594,6 +669,7 @@ async function saveVps(form: HTMLFormElement): Promise<void> {
       form.reset();
     }
 
+    navigateHome(false);
     await loadItems();
   } catch (error) {
     state.error = getErrorMessage(error);
@@ -609,10 +685,9 @@ async function handleAction(action: string, id: string): Promise<void> {
   }
 
   if (action === "edit") {
-    state.editingId = id;
+    state.editingId = null;
     state.notice = "";
-    render();
-    document.querySelector("#vps-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    navigateToForm(id);
     return;
   }
 
