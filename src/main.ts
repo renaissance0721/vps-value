@@ -28,6 +28,7 @@ interface VpsItem {
     cycleCny: number | null;
     monthlyCny: number | null;
     annualCny: number | null;
+    remainingValueCny: number | null;
   };
 }
 
@@ -37,6 +38,7 @@ interface Summary {
   cycleCny: number;
   monthlyCny: number;
   annualCny: number;
+  remainingValueCny: number;
   unknownCurrencies: string[];
 }
 
@@ -354,6 +356,11 @@ function renderSummary(): string {
         <strong>${summary ? formatCny(summary.annualCny) : "-"}</strong>
         <small>${formatRateTime(state.rates?.updatedAt)}</small>
       </article>
+      <article>
+        <span>剩余价值</span>
+        <strong>${summary ? formatCny(summary.remainingValueCny) : "-"}</strong>
+        <small>按剩余天数自动折算</small>
+      </article>
     </section>
   `;
 }
@@ -469,6 +476,7 @@ function renderTable(): string {
             <th>续费</th>
             <th>到期</th>
             <th>CNY</th>
+            <th>剩余价值</th>
             <th>状态</th>
             <th>操作</th>
           </tr>
@@ -512,6 +520,7 @@ function renderRow(item: VpsItem): string {
           <small>月均 ${formatMaybeCny(item.costs.monthlyCny)}</small>
         </div>
       </td>
+      <td>${formatMaybeCny(item.costs.remainingValueCny)}</td>
       <td>${renderStatus(item.status)}</td>
       <td>
         <div class="row-actions">

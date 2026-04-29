@@ -459,6 +459,11 @@ function toDto(row: VpsRow, rates: Rates) {
   const cycleMonths = getCycleMonths(row.cycle_count, row.cycle_unit);
   const monthlyCny = cycleCny === null ? null : roundMoney(cycleCny / cycleMonths);
   const annualCny = monthlyCny === null ? null : roundMoney(monthlyCny * 12);
+  const expiresInDays = getDaysUntil(row.expires_at);
+  const remainingValueCny =
+    cycleCny === null || row.status !== "active"
+      ? null
+      : calculateRemainingValue(cycleCny, expiresInDays, row.cycle_count, row.cycle_unit);
 
   return {
     id: row.id,
@@ -476,12 +481,13 @@ function toDto(row: VpsRow, rates: Rates) {
     deactivatedAt: row.deactivated_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    expiresInDays: getDaysUntil(row.expires_at),
+    expiresInDays,
     costs: {
       cycleOriginal,
       cycleCny,
       monthlyCny,
-      annualCny
+      annualCny,
+      remainingValueCny
     }
   };
 }
@@ -493,6 +499,7 @@ function summarize(items: ReturnType<typeof toDto>[]) {
   let cycleCny = 0;
   let monthlyCny = 0;
   let annualCny = 0;
+  let remainingValueCny = 0;
   let quantity = 0;
 
   for (const item of activeItems) {
@@ -506,6 +513,7 @@ function summarize(items: ReturnType<typeof toDto>[]) {
     cycleCny += item.costs.cycleCny;
     monthlyCny += item.costs.monthlyCny;
     annualCny += item.costs.annualCny;
+    remainingValueCny += item.costs.remainingValueCny ?? 0;
   }
 
   return {
@@ -514,6 +522,7 @@ function summarize(items: ReturnType<typeof toDto>[]) {
     cycleCny: roundMoney(cycleCny),
     monthlyCny: roundMoney(monthlyCny),
     annualCny: roundMoney(annualCny),
+    remainingValueCny: roundMoney(remainingValueCny),
     unknownCurrencies: Array.from(unknownCurrencies).sort()
   };
 }
@@ -614,6 +623,34 @@ function getCycleMonths(count: number, unit: CycleUnit): number {
   }
 
   return count * 12;
+}
+
+function getCycleDays(count: number, unit: CycleUnit): number {
+  if (unit === "day") {
+    return count;
+  }
+
+  if (unit === "month") {
+    return count * 30.4375;
+  }
+
+  return count * 365.25;
+}
+
+function calculateRemainingValue(
+  cycleCny: number,
+  expiresInDays: number,
+  cycleCount: number,
+  cycleUnit: CycleUnit
+): number {
+  const remainingDays = Math.max(0, expiresInDays);
+  const cycleDays = getCycleDays(cycleCount, cycleUnit);
+
+  if (cycleDays <= 0) {
+    return 0;
+  }
+
+  return roundMoney((cycleCny / cycleDays) * remainingDays);
 }
 
 function addCycle(dateOnly: string, count: number, unit: CycleUnit): string {
