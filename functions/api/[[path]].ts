@@ -497,6 +497,7 @@ function summarize(items: ReturnType<typeof toDto>[]) {
   const unknownCurrencies = new Set<string>();
 
   let cycleCny = 0;
+  let currentMonthDueCny = 0;
   let monthlyCny = 0;
   let annualCny = 0;
   let remainingValueCny = 0;
@@ -511,6 +512,9 @@ function summarize(items: ReturnType<typeof toDto>[]) {
     }
 
     cycleCny += item.costs.cycleCny;
+    if (isDueInCurrentMonth(item.expiresAt)) {
+      currentMonthDueCny += item.costs.cycleCny;
+    }
     monthlyCny += item.costs.monthlyCny;
     annualCny += item.costs.annualCny;
     remainingValueCny += item.costs.remainingValueCny ?? 0;
@@ -520,6 +524,7 @@ function summarize(items: ReturnType<typeof toDto>[]) {
     activeItemCount: activeItems.length,
     activeQuantity: quantity,
     cycleCny: roundMoney(cycleCny),
+    currentMonthDueCny: roundMoney(currentMonthDueCny),
     monthlyCny: roundMoney(monthlyCny),
     annualCny: roundMoney(annualCny),
     remainingValueCny: roundMoney(remainingValueCny),
@@ -651,6 +656,16 @@ function calculateRemainingValue(
   }
 
   return roundMoney((cycleCny / cycleDays) * remainingDays);
+}
+
+function isDueInCurrentMonth(dateOnly: string): boolean {
+  const now = new Date();
+  const date = parseDateOnly(dateOnly);
+
+  return (
+    date.getUTCFullYear() === now.getUTCFullYear() &&
+    date.getUTCMonth() === now.getUTCMonth()
+  );
 }
 
 function addCycle(dateOnly: string, count: number, unit: CycleUnit): string {

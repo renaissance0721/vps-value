@@ -36,6 +36,7 @@ interface Summary {
   activeItemCount: number;
   activeQuantity: number;
   cycleCny: number;
+  currentMonthDueCny: number;
   monthlyCny: number;
   annualCny: number;
   remainingValueCny: number;
@@ -342,9 +343,9 @@ function renderSummary(): string {
         <small>${summary ? `${summary.activeItemCount} 条记录` : "等待加载"}</small>
       </article>
       <article>
-        <span>本周期合计</span>
-        <strong>${summary ? formatCny(summary.cycleCny) : "-"}</strong>
-        <small>按每条记录的续费周期</small>
+        <span>本月需花费</span>
+        <strong>${summary ? formatCny(summary.currentMonthDueCny) : "-"}</strong>
+        <small>本自然月到期需续费</small>
       </article>
       <article>
         <span>月均成本</span>
