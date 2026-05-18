@@ -37,6 +37,7 @@ interface Summary {
   activeQuantity: number;
   cycleCny: number;
   currentMonthDueCny: number;
+  nextMonthDueCny: number;
   monthlyCny: number;
   annualCny: number;
   remainingValueCny: number;
@@ -346,6 +347,11 @@ function renderSummary(): string {
         <span>本月需花费</span>
         <strong>${summary ? formatCny(summary.currentMonthDueCny) : "-"}</strong>
         <small>本自然月到期需续费</small>
+      </article>
+      <article>
+        <span>下月需花费</span>
+        <strong>${summary ? formatCny(summary.nextMonthDueCny) : "-"}</strong>
+        <small>下个自然月到期需续费</small>
       </article>
       <article>
         <span>月均成本</span>

@@ -498,6 +498,7 @@ function summarize(items: ReturnType<typeof toDto>[]) {
 
   let cycleCny = 0;
   let currentMonthDueCny = 0;
+  let nextMonthDueCny = 0;
   let monthlyCny = 0;
   let annualCny = 0;
   let remainingValueCny = 0;
@@ -515,6 +516,9 @@ function summarize(items: ReturnType<typeof toDto>[]) {
     if (isDueInCurrentMonth(item.expiresAt)) {
       currentMonthDueCny += item.costs.cycleCny;
     }
+    if (isDueInNextMonth(item.expiresAt)) {
+      nextMonthDueCny += item.costs.cycleCny;
+    }
     monthlyCny += item.costs.monthlyCny;
     annualCny += item.costs.annualCny;
     remainingValueCny += item.costs.remainingValueCny ?? 0;
@@ -525,6 +529,7 @@ function summarize(items: ReturnType<typeof toDto>[]) {
     activeQuantity: quantity,
     cycleCny: roundMoney(cycleCny),
     currentMonthDueCny: roundMoney(currentMonthDueCny),
+    nextMonthDueCny: roundMoney(nextMonthDueCny),
     monthlyCny: roundMoney(monthlyCny),
     annualCny: roundMoney(annualCny),
     remainingValueCny: roundMoney(remainingValueCny),
@@ -665,6 +670,17 @@ function isDueInCurrentMonth(dateOnly: string): boolean {
   return (
     date.getUTCFullYear() === now.getUTCFullYear() &&
     date.getUTCMonth() === now.getUTCMonth()
+  );
+}
+
+function isDueInNextMonth(dateOnly: string): boolean {
+  const now = new Date();
+  const date = parseDateOnly(dateOnly);
+  const nextMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+
+  return (
+    date.getUTCFullYear() === nextMonth.getUTCFullYear() &&
+    date.getUTCMonth() === nextMonth.getUTCMonth()
   );
 }
 
