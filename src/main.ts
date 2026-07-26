@@ -89,6 +89,7 @@ const currencyOptions = [
   "KRW",
   "MYR",
   "THB",
+  "TRY",
   "PHP",
   "IDR",
   "VND",
@@ -378,6 +379,12 @@ function renderForm(item: SubscriptionItem | null): string {
   const cyclePreset = item ? getCyclePresetValue(item.cycleCount, item.cycleUnit) : "month";
   const quantity = item?.quantity ?? 1;
   const category = item?.category ?? state.categoryFilter;
+  const categoryOptions = Array.from(
+    new Set([...state.categories, ...(category ? [category] : [])])
+  );
+  const hasCategoryOptions = categoryOptions.length > 0;
+  const categoryChoice = category || (hasCategoryOptions ? "" : "__new_category__");
+  const isCreatingCategory = categoryChoice === "__new_category__";
   const note = item?.note ?? "";
   const vendorUrl = item?.vendorUrl ?? "";
 
@@ -444,19 +451,33 @@ function renderForm(item: SubscriptionItem | null): string {
       </div>
 
       <div class="field">
-        <label for="category">分类</label>
-        <input
-          id="category"
-          name="category"
-          list="category-options"
-          required
-          maxlength="80"
-          value="${h(category)}"
-          placeholder="选择已有分类或输入新分类"
-        />
-        <datalist id="category-options">
-          ${state.categories.map((option) => `<option value="${h(option)}"></option>`).join("")}
-        </datalist>
+        <label for="category-choice">分类</label>
+        <div class="category-entry">
+          <select id="category-choice" name="categoryChoice" required>
+            ${
+              hasCategoryOptions
+                ? `<option value="" ${categoryChoice ? "" : "selected"} disabled>请选择分类</option>`
+                : ""
+            }
+            ${categoryOptions
+              .map(
+                (option) => `
+                  <option value="${h(option)}" ${option === categoryChoice ? "selected" : ""}>
+                    ${h(option)}
+                  </option>
+                `
+              )
+              .join("")}
+            <option value="__new_category__" ${isCreatingCategory ? "selected" : ""}>＋ 新建分类</option>
+          </select>
+          <input
+            id="new-category"
+            name="newCategory"
+            maxlength="80"
+            placeholder="输入新分类名称"
+            ${isCreatingCategory ? "required" : "hidden"}
+          />
+        </div>
       </div>
 
       <div class="field">
@@ -635,6 +656,7 @@ function bindEvents(): void {
   });
 
   bindCurrencyPreview();
+  bindCategoryChoice();
 
   document.querySelector<HTMLButtonElement>("#cancel-edit")?.addEventListener("click", () => {
     state.editingId = null;
@@ -663,6 +685,11 @@ async function saveSubscription(form: HTMLFormElement): Promise<void> {
   const editingId = route.page === "form" ? route.id : null;
   const formData = new FormData(form);
   const cycle = getCyclePreset(String(formData.get("cyclePreset") ?? "month"));
+  const categoryChoice = String(formData.get("categoryChoice") ?? "");
+  const category =
+    categoryChoice === "__new_category__"
+      ? String(formData.get("newCategory") ?? "")
+      : categoryChoice;
   const payload = {
     provider: String(formData.get("provider") ?? ""),
     planName: String(formData.get("planName") ?? ""),
@@ -672,7 +699,7 @@ async function saveSubscription(form: HTMLFormElement): Promise<void> {
     cycleCount: cycle.cycleCount,
     cycleUnit: cycle.cycleUnit,
     quantity: Number(formData.get("quantity")),
-    category: String(formData.get("category") ?? ""),
+    category,
     note: String(formData.get("note") ?? ""),
     vendorUrl: String(formData.get("vendorUrl") ?? "")
   };
@@ -738,6 +765,27 @@ async function handleAction(action: string, id: string): Promise<void> {
     state.error = getErrorMessage(error);
     render();
   }
+}
+
+function bindCategoryChoice(): void {
+  const categorySelect = document.querySelector<HTMLSelectElement>("#category-choice");
+  const newCategoryInput = document.querySelector<HTMLInputElement>("#new-category");
+
+  if (!categorySelect || !newCategoryInput) {
+    return;
+  }
+
+  categorySelect.addEventListener("change", () => {
+    const isCreating = categorySelect.value === "__new_category__";
+    newCategoryInput.hidden = !isCreating;
+    newCategoryInput.required = isCreating;
+
+    if (isCreating) {
+      newCategoryInput.focus();
+    } else {
+      newCategoryInput.value = "";
+    }
+  });
 }
 
 function bindCurrencyPreview(): void {
