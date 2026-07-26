@@ -2,11 +2,9 @@ import "./styles.css";
 
 type CycleUnit = "day" | "month" | "year";
 type CyclePreset = "week" | "month" | "quarter" | "half_year" | "year" | "two_year" | "three_year";
-type VpsStatus = "active" | "inactive";
-type StatusFilter = "active" | "inactive" | "all";
 type Route = { page: "home" } | { page: "form"; id: string | null };
 
-interface VpsItem {
+interface SubscriptionItem {
   id: string;
   provider: string;
   planName: string;
@@ -17,8 +15,9 @@ interface VpsItem {
   cycleUnit: CycleUnit;
   quantity: number;
   category: string;
+  note: string;
   vendorUrl: string | null;
-  status: VpsStatus;
+  status: "active" | "inactive";
   deactivatedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -55,8 +54,9 @@ interface Rates {
 }
 
 interface ListResponse {
-  items: VpsItem[];
+  items: SubscriptionItem[];
   summary: Summary;
+  categories: string[];
   rates: Rates;
 }
 
@@ -116,18 +116,13 @@ const cyclePresetOptions: Array<{
   { value: "three_year", label: "三年", cycleCount: 3, cycleUnit: "year" }
 ];
 
-const filterLabels: Record<StatusFilter, string> = {
-  active: "使用中",
-  inactive: "已停用",
-  all: "全部"
-};
-
 const state: {
   token: string;
   authRequired: boolean;
   dbConfigured: boolean;
-  filter: StatusFilter;
-  items: VpsItem[];
+  categoryFilter: string;
+  categories: string[];
+  items: SubscriptionItem[];
   summary: Summary | null;
   rates: Rates | null;
   loading: boolean;
@@ -138,7 +133,8 @@ const state: {
   token: localStorage.getItem(tokenStorageKey) ?? "",
   authRequired: true,
   dbConfigured: true,
-  filter: "active",
+  categoryFilter: "",
+  categories: [],
   items: [],
   summary: null,
   rates: null,
@@ -177,9 +173,13 @@ async function loadItems(): Promise<void> {
   render();
 
   try {
-    const data = await apiFetch<ListResponse>(`/api/vps?status=${state.filter}`);
+    const query = state.categoryFilter
+      ? `?category=${encodeURIComponent(state.categoryFilter)}`
+      : "";
+    const data = await apiFetch<ListResponse>(`/api/subscriptions${query}`);
     state.items = data.items;
     state.summary = data.summary;
+    state.categories = data.categories;
     state.rates = data.rates;
   } catch (error) {
     state.error = getErrorMessage(error);
@@ -199,8 +199,8 @@ function render(): void {
     <main class="shell ${route.page === "home" ? "home-shell" : "form-shell"}">
       <header class="topbar">
         <div>
-          <h1>VPS Value</h1>
-          <p>VPS 开销记录</p>
+          <h1>夕凪の订阅</h1>
+          <p>线上付费订阅聚合</p>
         </div>
         ${renderAuth()}
       </header>
@@ -279,22 +279,19 @@ function renderHomePage(): string {
         <div class="panel-heading list-heading">
           <h2>记录</h2>
           <div class="list-tools">
-            <button id="new-vps" type="button">新增 VPS</button>
-            <div class="segmented" role="tablist" aria-label="筛选 VPS 状态">
-              ${(["active", "inactive", "all"] as StatusFilter[])
+            <button id="new-subscription" type="button">新增</button>
+            <select class="category-filter" id="category-filter" aria-label="按分类筛选">
+              <option value="">全部分类</option>
+              ${state.categories
                 .map(
-                  (filter) => `
-                    <button
-                      class="${state.filter === filter ? "is-active" : ""}"
-                      type="button"
-                      data-filter="${filter}"
-                    >
-                      ${filterLabels[filter]}
-                    </button>
+                  (category) => `
+                    <option value="${h(category)}" ${category === state.categoryFilter ? "selected" : ""}>
+                      ${h(category)}
+                    </option>
                   `
                 )
                 .join("")}
-            </div>
+            </select>
           </div>
         </div>
         <div class="list-scroll">
@@ -305,16 +302,16 @@ function renderHomePage(): string {
   `;
 }
 
-function renderFormPage(item: VpsItem | null, id: string | null): string {
+function renderFormPage(item: SubscriptionItem | null, id: string | null): string {
   if (id && !item) {
     return `
       <section class="form-page">
         <section class="panel form-panel">
           <div class="panel-heading">
-            <h2>修改 VPS</h2>
+            <h2>修改订阅</h2>
             <button class="ghost" id="back-home" type="button">返回主页</button>
           </div>
-          <div class="table-state">${state.loading ? "加载中..." : "未找到这条 VPS 记录"}</div>
+          <div class="table-state">${state.loading ? "加载中..." : "未找到这条订阅记录"}</div>
         </section>
       </section>
     `;
@@ -324,7 +321,7 @@ function renderFormPage(item: VpsItem | null, id: string | null): string {
     <section class="form-page">
       <section class="panel form-panel">
         <div class="panel-heading">
-          <h2>${item ? "修改 VPS" : "新增 VPS"}</h2>
+          <h2>${item ? "修改订阅" : "新增订阅"}</h2>
           <button class="ghost" id="back-home" type="button">返回主页</button>
         </div>
         ${renderForm(item)}
@@ -339,7 +336,7 @@ function renderSummary(): string {
   return `
     <section class="summary-grid" aria-label="费用汇总">
       <article>
-        <span>使用中 VPS</span>
+        <span>订阅数量</span>
         <strong>${summary ? summary.activeQuantity : "-"}</strong>
         <small>${summary ? `${summary.activeItemCount} 条记录` : "等待加载"}</small>
       </article>
@@ -372,7 +369,7 @@ function renderSummary(): string {
   `;
 }
 
-function renderForm(item: VpsItem | null): string {
+function renderForm(item: SubscriptionItem | null): string {
   const provider = item?.provider ?? "";
   const planName = item?.planName ?? "";
   const price = item?.price ?? "";
@@ -380,18 +377,19 @@ function renderForm(item: VpsItem | null): string {
   const expiresAt = item?.expiresAt ?? defaultExpiryDate();
   const cyclePreset = item ? getCyclePresetValue(item.cycleCount, item.cycleUnit) : "month";
   const quantity = item?.quantity ?? 1;
-  const category = item?.category ?? "默认";
+  const category = item?.category ?? state.categoryFilter;
+  const note = item?.note ?? "";
   const vendorUrl = item?.vendorUrl ?? "";
 
   return `
-    <form class="vps-form" id="vps-form">
+    <form class="subscription-form" id="subscription-form">
       <div class="field">
-        <label for="provider">商家名称</label>
+        <label for="provider">服务商名称</label>
         <input id="provider" name="provider" required maxlength="80" value="${h(provider)}" />
       </div>
 
       <div class="field">
-        <label for="plan-name">套餐名称</label>
+        <label for="plan-name">订阅名称</label>
         <input id="plan-name" name="planName" required maxlength="120" value="${h(planName)}" />
       </div>
 
@@ -427,7 +425,7 @@ function renderForm(item: VpsItem | null): string {
           <input id="expires-at" name="expiresAt" required type="date" value="${h(expiresAt)}" />
         </div>
         <div class="field">
-          <label for="quantity">VPS 总数</label>
+          <label for="quantity">订阅数量</label>
           <input id="quantity" name="quantity" required min="1" step="1" type="number" value="${h(String(quantity))}" />
         </div>
       </div>
@@ -446,17 +444,33 @@ function renderForm(item: VpsItem | null): string {
       </div>
 
       <div class="field">
-        <label for="category">VPS 分类</label>
-        <input id="category" name="category" maxlength="80" value="${h(category)}" />
+        <label for="category">分类</label>
+        <input
+          id="category"
+          name="category"
+          list="category-options"
+          required
+          maxlength="80"
+          value="${h(category)}"
+          placeholder="选择已有分类或输入新分类"
+        />
+        <datalist id="category-options">
+          ${state.categories.map((option) => `<option value="${h(option)}"></option>`).join("")}
+        </datalist>
       </div>
 
       <div class="field">
-        <label for="vendor-url">商家官网链接</label>
+        <label for="note">备注</label>
+        <input id="note" name="note" maxlength="300" value="${h(note)}" placeholder="可选" />
+      </div>
+
+      <div class="field">
+        <label for="vendor-url">官网链接</label>
         <input id="vendor-url" name="vendorUrl" maxlength="300" type="url" value="${h(vendorUrl)}" placeholder="https://" />
       </div>
 
       <div class="form-actions">
-        <button type="submit">${item ? "保存修改" : "新增 VPS"}</button>
+        <button type="submit">${item ? "保存修改" : "新增"}</button>
         ${item ? `<button class="ghost" id="cancel-edit" type="button">取消</button>` : ""}
       </div>
     </form>
@@ -477,7 +491,7 @@ function renderTable(): string {
       <table>
         <thead>
           <tr>
-            <th>VPS</th>
+            <th>订阅</th>
             <th>分类</th>
             <th>价格</th>
             <th>续费</th>
@@ -485,6 +499,7 @@ function renderTable(): string {
             <th>CNY</th>
             <th>剩余价值</th>
             <th>状态</th>
+            <th>备注</th>
             <th>操作</th>
           </tr>
         </thead>
@@ -496,13 +511,13 @@ function renderTable(): string {
   `;
 }
 
-function renderRow(item: VpsItem): string {
+function renderRow(item: SubscriptionItem): string {
   const expiryClass = getExpiryClass(item.expiresInDays);
 
   return `
     <tr>
       <td>
-        <div class="vps-name">
+        <div class="subscription-name">
           <strong>${h(item.provider)}</strong>
           <span>${h(item.planName)}</span>
         </div>
@@ -528,36 +543,30 @@ function renderRow(item: VpsItem): string {
         </div>
       </td>
       <td>${formatMaybeCny(item.costs.remainingValueCny)}</td>
-      <td>${renderStatus(item.status)}</td>
+      <td>${renderSubscriptionStatus(item.expiresInDays)}</td>
+      <td>${item.note ? h(item.note) : "-"}</td>
       <td>
         <div class="row-actions">
           ${item.vendorUrl ? `<a class="link-button" href="${h(item.vendorUrl)}" target="_blank" rel="noreferrer">官网</a>` : ""}
           <button class="small" type="button" data-action="edit" data-id="${h(item.id)}">编辑</button>
-          ${renderStateActions(item)}
+          <button class="small" type="button" data-action="renew" data-id="${h(item.id)}">续费</button>
+          <button class="small danger" type="button" data-action="delete" data-id="${h(item.id)}">删除</button>
         </div>
       </td>
     </tr>
   `;
 }
 
-function renderStateActions(item: VpsItem): string {
-  if (item.status === "active") {
-    return `
-      <button class="small" type="button" data-action="renew" data-id="${h(item.id)}">续费</button>
-      <button class="small danger" type="button" data-action="deactivate" data-id="${h(item.id)}">停用</button>
-    `;
+function renderSubscriptionStatus(expiresInDays: number): string {
+  if (expiresInDays < 0) {
+    return `<span class="status danger">已过期</span>`;
   }
 
-  return `
-    <button class="small" type="button" data-action="restore" data-id="${h(item.id)}">恢复</button>
-    <button class="small danger" type="button" data-action="delete" data-id="${h(item.id)}">删除</button>
-  `;
-}
+  if (expiresInDays <= 10) {
+    return `<span class="status warning">即将到期</span>`;
+  }
 
-function renderStatus(status: VpsStatus): string {
-  return status === "active"
-    ? `<span class="status active">使用中</span>`
-    : `<span class="status inactive">已停用</span>`;
+  return `<span class="status active">订阅中</span>`;
 }
 
 function getRoute(): Route {
@@ -590,7 +599,7 @@ function navigateHome(shouldRender = true): void {
 }
 
 function bindEvents(): void {
-  document.querySelector<HTMLButtonElement>("#new-vps")?.addEventListener("click", () => {
+  document.querySelector<HTMLButtonElement>("#new-subscription")?.addEventListener("click", () => {
     navigateToForm(null);
   });
 
@@ -620,9 +629,9 @@ function bindEvents(): void {
     void loadItems();
   });
 
-  document.querySelector<HTMLFormElement>("#vps-form")?.addEventListener("submit", (event) => {
+  document.querySelector<HTMLFormElement>("#subscription-form")?.addEventListener("submit", (event) => {
     event.preventDefault();
-    void saveVps(event.currentTarget as HTMLFormElement);
+    void saveSubscription(event.currentTarget as HTMLFormElement);
   });
 
   bindCurrencyPreview();
@@ -633,13 +642,11 @@ function bindEvents(): void {
     navigateHome();
   });
 
-  document.querySelectorAll<HTMLButtonElement>("[data-filter]").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.filter = button.dataset.filter as StatusFilter;
-      state.editingId = null;
-      state.notice = "";
-      void loadItems();
-    });
+  document.querySelector<HTMLSelectElement>("#category-filter")?.addEventListener("change", (event) => {
+    state.categoryFilter = (event.currentTarget as HTMLSelectElement).value;
+    state.editingId = null;
+    state.notice = "";
+    void loadItems();
   });
 
   document.querySelectorAll<HTMLButtonElement>("[data-action]").forEach((button) => {
@@ -651,7 +658,7 @@ function bindEvents(): void {
   });
 }
 
-async function saveVps(form: HTMLFormElement): Promise<void> {
+async function saveSubscription(form: HTMLFormElement): Promise<void> {
   const route = getRoute();
   const editingId = route.page === "form" ? route.id : null;
   const formData = new FormData(form);
@@ -666,23 +673,28 @@ async function saveVps(form: HTMLFormElement): Promise<void> {
     cycleUnit: cycle.cycleUnit,
     quantity: Number(formData.get("quantity")),
     category: String(formData.get("category") ?? ""),
+    note: String(formData.get("note") ?? ""),
     vendorUrl: String(formData.get("vendorUrl") ?? "")
   };
 
   try {
     if (editingId) {
-      await apiFetch(`/api/vps/${encodeURIComponent(editingId)}`, {
+      await apiFetch(`/api/subscriptions/${encodeURIComponent(editingId)}`, {
         method: "PATCH",
         body: JSON.stringify(payload)
       });
-      state.notice = "VPS 已更新";
+      state.notice = "订阅已更新";
     } else {
-      await apiFetch("/api/vps", {
+      await apiFetch("/api/subscriptions", {
         method: "POST",
         body: JSON.stringify(payload)
       });
-      state.notice = "VPS 已新增";
+      state.notice = "订阅已新增";
       form.reset();
+    }
+
+    if (state.categoryFilter && state.categoryFilter !== payload.category.trim()) {
+      state.categoryFilter = payload.category.trim();
     }
 
     navigateHome(false);
@@ -709,29 +721,16 @@ async function handleAction(action: string, id: string): Promise<void> {
 
   try {
     if (action === "renew") {
-      await apiFetch(`/api/vps/${encodeURIComponent(id)}/renew`, { method: "POST" });
+      await apiFetch(`/api/subscriptions/${encodeURIComponent(id)}/renew`, { method: "POST" });
       state.notice = "到期时间已顺延一个续费周期";
     }
 
-    if (action === "deactivate") {
-      if (!confirm(`停用 ${item.provider} / ${item.planName}？`)) {
-        return;
-      }
-      await apiFetch(`/api/vps/${encodeURIComponent(id)}/deactivate`, { method: "POST" });
-      state.notice = "VPS 已停用";
-    }
-
-    if (action === "restore") {
-      await apiFetch(`/api/vps/${encodeURIComponent(id)}/restore`, { method: "POST" });
-      state.notice = "VPS 已恢复";
-    }
-
     if (action === "delete") {
-      if (!confirm(`永久删除 ${item.provider} / ${item.planName}？`)) {
+      if (!confirm(`永久删除 ${item.provider} / ${item.planName}？此操作无法撤销。`)) {
         return;
       }
-      await apiFetch(`/api/vps/${encodeURIComponent(id)}`, { method: "DELETE" });
-      state.notice = "VPS 已删除";
+      await apiFetch(`/api/subscriptions/${encodeURIComponent(id)}`, { method: "DELETE" });
+      state.notice = "订阅已删除";
     }
 
     await loadItems();
@@ -931,11 +930,7 @@ function getExpiryClass(days: number): string {
     return "expired";
   }
 
-  if (days <= 7) {
-    return "danger";
-  }
-
-  if (days <= 30) {
+  if (days <= 10) {
     return "warning";
   }
 

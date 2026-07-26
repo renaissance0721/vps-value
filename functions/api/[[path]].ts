@@ -4,9 +4,9 @@ interface Env {
 }
 
 type CycleUnit = "day" | "month" | "year";
-type VpsStatus = "active" | "inactive";
+type SubscriptionStatus = "active" | "inactive";
 
-interface VpsRow {
+interface SubscriptionRow {
   id: string;
   provider: string;
   plan_name: string;
@@ -17,8 +17,9 @@ interface VpsRow {
   cycle_unit: CycleUnit;
   quantity: number;
   category: string;
+  note: string;
   vendor_url: string | null;
-  status: VpsStatus;
+  status: SubscriptionStatus;
   deactivated_at: string | null;
   created_at: string;
   updated_at: string;
@@ -34,7 +35,7 @@ interface Rates {
   error?: string;
 }
 
-interface ValidatedVpsInput {
+interface ValidatedSubscriptionInput {
   provider?: string;
   planName?: string;
   price?: number;
@@ -44,6 +45,7 @@ interface ValidatedVpsInput {
   cycleUnit?: CycleUnit;
   quantity?: number;
   category?: string;
+  note?: string;
   vendorUrl?: string | null;
 }
 
@@ -93,8 +95,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       return json({ rates: await getRates() });
     }
 
-    if (parts[0] === "vps") {
-      return handleVps(request, env, parts);
+    if (parts[0] === "subscriptions") {
+      return handleSubscriptions(request, env, parts);
     }
 
     throw new ApiError(404, "not_found", "接口不存在");
@@ -125,25 +127,25 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   }
 };
 
-async function handleVps(request: Request, env: Env, parts: string[]): Promise<Response> {
+async function handleSubscriptions(request: Request, env: Env, parts: string[]): Promise<Response> {
   if (parts.length === 1) {
     if (request.method === "GET") {
       const url = new URL(request.url);
-      const status = url.searchParams.get("status") ?? "active";
-      return listVps(env, status);
+      const category = url.searchParams.get("category")?.trim() ?? "";
+      return listSubscriptions(env, category);
     }
 
     if (request.method === "POST") {
-      const input = validateVpsInput(await readJson(request), false);
+      const input = validateSubscriptionInput(await readJson(request), false);
       const now = new Date().toISOString();
       const id = crypto.randomUUID();
 
       await env.DB.prepare(
-        `INSERT INTO vps (
+        `INSERT INTO subscriptions (
           id, provider, plan_name, price, currency, expires_at,
-          cycle_count, cycle_unit, quantity, category, vendor_url,
+          cycle_count, cycle_unit, quantity, category, note, vendor_url,
           status, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`
       )
         .bind(
           id,
@@ -156,54 +158,47 @@ async function handleVps(request: Request, env: Env, parts: string[]): Promise<R
           input.cycleUnit,
           input.quantity,
           input.category,
+          input.note,
           input.vendorUrl,
           now,
           now
         )
         .run();
 
-      return json({ item: await getVpsDto(env, id) }, 201);
+      return json({ item: await getSubscriptionDto(env, id) }, 201);
     }
   }
 
   const id = decodeURIComponent(parts[1] ?? "");
   if (!id) {
-    throw new ApiError(404, "not_found", "VPS 不存在");
+    throw new ApiError(404, "not_found", "订阅不存在");
   }
 
   if (parts.length === 2) {
     if (request.method === "PATCH") {
-      const input = validateVpsInput(await readJson(request), true);
+      const input = validateSubscriptionInput(await readJson(request), true);
       const entries = toDbUpdateEntries(input);
 
       if (entries.length === 0) {
-        return json({ item: await getVpsDto(env, id) });
+        return json({ item: await getSubscriptionDto(env, id) });
       }
 
       const assignments = entries.map(([column]) => `${column} = ?`);
       const values = entries.map(([, value]) => value);
 
       const result = await env.DB.prepare(
-        `UPDATE vps SET ${assignments.join(", ")}, updated_at = ? WHERE id = ?`
+        `UPDATE subscriptions SET ${assignments.join(", ")}, updated_at = ? WHERE id = ?`
       )
         .bind(...values, new Date().toISOString(), id)
         .run();
 
-      assertChanged(result, "VPS 不存在");
-      return json({ item: await getVpsDto(env, id) });
+      assertChanged(result, "订阅不存在");
+      return json({ item: await getSubscriptionDto(env, id) });
     }
 
     if (request.method === "DELETE") {
-      const row = await getVpsRow(env, id);
-      if (!row) {
-        throw new ApiError(404, "not_found", "VPS 不存在");
-      }
-
-      if (row.status !== "inactive") {
-        throw new ApiError(409, "must_deactivate_first", "需要先停用 VPS，才能删除");
-      }
-
-      await env.DB.prepare("DELETE FROM vps WHERE id = ?").bind(id).run();
+      const result = await env.DB.prepare("DELETE FROM subscriptions WHERE id = ?").bind(id).run();
+      assertChanged(result, "订阅不存在");
       return json({ ok: true });
     }
   }
@@ -213,115 +208,107 @@ async function handleVps(request: Request, env: Env, parts: string[]): Promise<R
 
     if (action === "deactivate") {
       const result = await env.DB.prepare(
-        `UPDATE vps
+        `UPDATE subscriptions
          SET status = 'inactive', deactivated_at = ?, updated_at = ?
          WHERE id = ? AND status = 'active'`
       )
         .bind(new Date().toISOString(), new Date().toISOString(), id)
         .run();
 
-      assertChanged(result, "VPS 不存在或已停用");
-      return json({ item: await getVpsDto(env, id) });
+      assertChanged(result, "订阅不存在或已停用");
+      return json({ item: await getSubscriptionDto(env, id) });
     }
 
     if (action === "restore") {
       const result = await env.DB.prepare(
-        `UPDATE vps
+        `UPDATE subscriptions
          SET status = 'active', deactivated_at = NULL, updated_at = ?
          WHERE id = ? AND status = 'inactive'`
       )
         .bind(new Date().toISOString(), id)
         .run();
 
-      assertChanged(result, "VPS 不存在或未停用");
-      return json({ item: await getVpsDto(env, id) });
+      assertChanged(result, "订阅不存在或未停用");
+      return json({ item: await getSubscriptionDto(env, id) });
     }
 
     if (action === "renew") {
-      const row = await getVpsRow(env, id);
+      const row = await getSubscriptionRow(env, id);
       if (!row) {
-        throw new ApiError(404, "not_found", "VPS 不存在");
+        throw new ApiError(404, "not_found", "订阅不存在");
       }
 
       const nextExpiresAt = addCycle(row.expires_at, row.cycle_count, row.cycle_unit);
       const result = await env.DB.prepare(
-        "UPDATE vps SET expires_at = ?, updated_at = ? WHERE id = ?"
+        "UPDATE subscriptions SET expires_at = ?, updated_at = ? WHERE id = ?"
       )
         .bind(nextExpiresAt, new Date().toISOString(), id)
         .run();
 
-      assertChanged(result, "VPS 不存在");
-      return json({ item: await getVpsDto(env, id) });
+      assertChanged(result, "订阅不存在");
+      return json({ item: await getSubscriptionDto(env, id) });
     }
   }
 
   throw new ApiError(405, "method_not_allowed", "请求方法不支持");
 }
 
-async function listVps(env: Env, status: string): Promise<Response> {
-  const normalizedStatus = status.toLowerCase();
+async function listSubscriptions(env: Env, category: string): Promise<Response> {
   const rates = await getRates();
-  let rows: VpsRow[];
-
-  if (normalizedStatus === "all") {
-    const result = await env.DB.prepare(
-      "SELECT * FROM vps ORDER BY status ASC, expires_at ASC, provider ASC"
-    ).all<VpsRow>();
-    rows = result.results ?? [];
-  } else if (normalizedStatus === "active" || normalizedStatus === "inactive") {
-    const result = await env.DB.prepare(
-      "SELECT * FROM vps WHERE status = ? ORDER BY expires_at ASC, provider ASC"
-    )
-      .bind(normalizedStatus)
-      .all<VpsRow>();
-    rows = result.results ?? [];
-  } else {
-    throw new ApiError(400, "invalid_status", "status 只能是 active、inactive 或 all");
-  }
-
+  const rows = category
+    ? (
+        await env.DB.prepare(
+          `SELECT * FROM subscriptions
+           WHERE status = 'active' AND category = ?
+           ORDER BY expires_at ASC, provider ASC`
+        )
+          .bind(category)
+          .all<SubscriptionRow>()
+      ).results ?? []
+    : (
+        await env.DB.prepare(
+          `SELECT * FROM subscriptions
+           WHERE status = 'active'
+           ORDER BY expires_at ASC, provider ASC`
+        ).all<SubscriptionRow>()
+      ).results ?? [];
+  const categoryRows = await env.DB.prepare(
+    `SELECT DISTINCT category FROM subscriptions
+     WHERE status = 'active' AND category <> ''
+     ORDER BY category COLLATE NOCASE ASC`
+  ).all<{ category: string }>();
   const items = rows.map((row) => toDto(row, rates));
-  const summaryItems =
-    normalizedStatus === "inactive"
-      ? (await getRowsByStatus(env, "active")).map((row) => toDto(row, rates))
-      : items;
 
   return json({
     items,
-    summary: summarize(summaryItems),
+    summary: summarize(items),
+    categories: (categoryRows.results ?? []).map((row) => row.category),
     rates
   });
 }
 
-async function getRowsByStatus(env: Env, status: VpsStatus): Promise<VpsRow[]> {
-  const result = await env.DB.prepare(
-    "SELECT * FROM vps WHERE status = ? ORDER BY expires_at ASC, provider ASC"
-  )
-    .bind(status)
-    .all<VpsRow>();
-
-  return result.results ?? [];
-}
-
-async function getVpsDto(env: Env, id: string) {
-  const row = await getVpsRow(env, id);
+async function getSubscriptionDto(env: Env, id: string) {
+  const row = await getSubscriptionRow(env, id);
   if (!row) {
-    throw new ApiError(404, "not_found", "VPS 不存在");
+    throw new ApiError(404, "not_found", "订阅不存在");
   }
 
   return toDto(row, await getRates());
 }
 
-async function getVpsRow(env: Env, id: string): Promise<VpsRow | null> {
-  return env.DB.prepare("SELECT * FROM vps WHERE id = ?").bind(id).first<VpsRow>();
+async function getSubscriptionRow(env: Env, id: string): Promise<SubscriptionRow | null> {
+  return env.DB.prepare("SELECT * FROM subscriptions WHERE id = ?")
+    .bind(id)
+    .first<SubscriptionRow>();
 }
 
-function validateVpsInput(raw: unknown, partial: boolean): ValidatedVpsInput {
+function validateSubscriptionInput(raw: unknown, partial: boolean): ValidatedSubscriptionInput {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     throw new ApiError(400, "invalid_body", "请求体必须是 JSON 对象");
   }
 
   const input = raw as Record<string, unknown>;
-  const output: ValidatedVpsInput = {};
+  const output: ValidatedSubscriptionInput = {};
 
   if (has(input, "provider") || !partial) {
     output.provider = readString(input.provider, "商家名称", 1, 80);
@@ -364,11 +351,15 @@ function validateVpsInput(raw: unknown, partial: boolean): ValidatedVpsInput {
   }
 
   if (has(input, "quantity") || !partial) {
-    output.quantity = readInteger(input.quantity, "VPS 总数", 1, 100000);
+    output.quantity = readInteger(input.quantity, "订阅数量", 1, 100000);
   }
 
   if (has(input, "category") || !partial) {
-    output.category = readString(input.category ?? "默认", "VPS 分类", 0, 80) || "默认";
+    output.category = readString(input.category, "分类", 1, 80);
+  }
+
+  if (has(input, "note") || !partial) {
+    output.note = readString(input.note ?? "", "备注", 0, 300);
   }
 
   if (has(input, "vendorUrl") || !partial) {
@@ -378,9 +369,9 @@ function validateVpsInput(raw: unknown, partial: boolean): ValidatedVpsInput {
   return output;
 }
 
-function toDbUpdateEntries(input: ValidatedVpsInput): Array<[string, string | number | null]> {
+function toDbUpdateEntries(input: ValidatedSubscriptionInput): Array<[string, string | number | null]> {
   const entries: Array<[string, string | number | null]> = [];
-  const mapping: Array<[keyof ValidatedVpsInput, string]> = [
+  const mapping: Array<[keyof ValidatedSubscriptionInput, string]> = [
     ["provider", "provider"],
     ["planName", "plan_name"],
     ["price", "price"],
@@ -390,6 +381,7 @@ function toDbUpdateEntries(input: ValidatedVpsInput): Array<[string, string | nu
     ["cycleUnit", "cycle_unit"],
     ["quantity", "quantity"],
     ["category", "category"],
+    ["note", "note"],
     ["vendorUrl", "vendor_url"]
   ];
 
@@ -453,7 +445,7 @@ function readOptionalUrl(value: unknown, label: string): string | null {
   }
 }
 
-function toDto(row: VpsRow, rates: Rates) {
+function toDto(row: SubscriptionRow, rates: Rates) {
   const cycleOriginal = roundMoney(row.price * row.quantity);
   const cycleCny = convertToCny(cycleOriginal, row.currency, rates);
   const cycleMonths = getCycleMonths(row.cycle_count, row.cycle_unit);
@@ -476,6 +468,7 @@ function toDto(row: VpsRow, rates: Rates) {
     cycleUnit: row.cycle_unit,
     quantity: row.quantity,
     category: row.category,
+    note: row.note,
     vendorUrl: row.vendor_url,
     status: row.status,
     deactivatedAt: row.deactivated_at,

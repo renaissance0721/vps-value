@@ -1,6 +1,7 @@
 :root {
   color: #1d252d;
   background: #f6f7f8;
+  font-size: 18px;
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
@@ -26,10 +27,10 @@ select {
 
 button,
 .link-button {
-  min-height: 38px;
+  min-height: 46px;
   border: 1px solid #202a33;
   border-radius: 6px;
-  padding: 0 14px;
+  padding: 0 18px;
   color: #ffffff;
   background: #202a33;
   cursor: pointer;
@@ -56,9 +57,9 @@ button.ghost:hover {
 
 button.small,
 .link-button {
-  min-height: 32px;
-  padding: 0 10px;
-  font-size: 13px;
+  min-height: 42px;
+  padding: 0 16px;
+  font-size: 17px;
 }
 
 button.danger {
@@ -73,10 +74,10 @@ button.danger:hover {
 input,
 select {
   width: 100%;
-  min-height: 40px;
+  min-height: 48px;
   border: 1px solid #c8d0d8;
   border-radius: 6px;
-  padding: 0 10px;
+  padding: 0 14px;
   color: #1d252d;
   background: #ffffff;
 }
@@ -94,7 +95,7 @@ a {
 }
 
 .shell {
-  width: min(1180px, calc(100% - 32px));
+  width: min(1440px, calc(100% - 40px));
   margin: 0 auto;
   padding: 28px 0 36px;
 }
@@ -121,7 +122,7 @@ a {
 
 .topbar h1 {
   margin: 0;
-  font-size: clamp(28px, 4vw, 42px);
+  font-size: clamp(27px, 3vw, 36px);
   line-height: 1.05;
   letter-spacing: 0;
 }
@@ -141,7 +142,7 @@ a {
 .auth-form label {
   align-self: center;
   color: #4f5b66;
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .auth-note {
@@ -180,7 +181,7 @@ a {
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 12px;
+  gap: 8px;
   margin-bottom: 16px;
 }
 
@@ -192,8 +193,8 @@ a {
 }
 
 .summary-grid article {
-  min-height: 112px;
-  padding: 16px;
+  min-height: 134px;
+  padding: 20px;
 }
 
 .summary-grid span,
@@ -202,10 +203,19 @@ a {
   color: #66727f;
 }
 
+.summary-grid span {
+  font-size: 19px;
+}
+
+.summary-grid small {
+  font-size: 16px;
+  line-height: 1.35;
+}
+
 .summary-grid strong {
   display: block;
   margin: 8px 0 6px;
-  font-size: clamp(22px, 3vw, 30px);
+  font-size: clamp(28px, 3vw, 36px);
   line-height: 1.1;
   letter-spacing: 0;
 }
@@ -217,7 +227,7 @@ a {
 }
 
 .form-page {
-  width: min(720px, 100%);
+  width: min(840px, 100%);
   margin: 0 auto;
 }
 
@@ -233,19 +243,19 @@ a {
   justify-content: space-between;
   gap: 12px;
   border-bottom: 1px solid #e8ecef;
-  padding: 14px 16px;
+  padding: 18px 20px;
 }
 
 .panel-heading h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 22px;
   line-height: 1.2;
 }
 
-.vps-form {
+.subscription-form {
   display: grid;
-  gap: 14px;
-  padding: 22px;
+  gap: 18px;
+  padding: 30px;
 }
 
 .form-row {
@@ -261,16 +271,16 @@ a {
 
 .field label {
   color: #4f5b66;
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .currency-preview-box {
-  min-height: 40px;
+  min-height: 48px;
   display: flex;
   align-items: center;
   border: 1px solid #c8d0d8;
   border-radius: 6px;
-  padding: 0 10px;
+  padding: 0 14px;
   color: #202a33;
   background: #f7f9fa;
 }
@@ -289,6 +299,20 @@ a {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+#new-subscription {
+  width: 76px;
+  min-width: 76px;
+  min-height: 46px;
+  padding: 0 16px;
+  font-size: 21px;
+}
+
+.category-filter {
+  width: auto;
+  min-width: 160px;
+  min-height: 46px;
 }
 
 .segmented {
@@ -329,13 +353,14 @@ a {
 table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 940px;
+  min-width: 1120px;
+  font-size: 19px;
 }
 
 th,
 td {
   border-bottom: 1px solid #edf0f2;
-  padding: 12px 14px;
+  padding: 16px 10px;
   text-align: left;
   vertical-align: middle;
 }
@@ -345,7 +370,7 @@ th {
   top: 0;
   z-index: 1;
   color: #66727f;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 600;
   background: #fbfcfd;
 }
@@ -354,18 +379,18 @@ tbody tr:hover {
   background: #f9fbfc;
 }
 
-.vps-name,
+.subscription-name,
 .price-cell,
 .expiry {
   display: grid;
   gap: 3px;
 }
 
-.vps-name span,
+.subscription-name span,
 .price-cell small,
 .expiry small {
   color: #66727f;
-  font-size: 13px;
+  font-size: 16px;
 }
 
 .expiry.expired span,
@@ -387,13 +412,23 @@ tbody tr:hover {
   align-items: center;
   border-radius: 999px;
   padding: 0 10px;
-  font-size: 13px;
+  font-size: 14px;
   white-space: nowrap;
 }
 
 .status.active {
   color: #1e5b36;
   background: #e5f5ea;
+}
+
+.status.warning {
+  color: #755600;
+  background: #fff0b8;
+}
+
+.status.danger {
+  color: #8b2525;
+  background: #fde0e0;
 }
 
 .status.inactive {
@@ -404,8 +439,18 @@ tbody tr:hover {
 .row-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  min-width: 220px;
+  gap: 4px;
+  min-width: 210px;
+}
+
+.row-actions button,
+.row-actions .link-button {
+  width: 76px;
+  min-width: 76px;
+}
+
+.row-actions button {
+  font-size: 19px;
 }
 
 .table-state {
@@ -417,7 +462,7 @@ tbody tr:hover {
   flex: 0 0 auto;
   margin-top: 18px;
   color: #66727f;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 @media (max-width: 920px) {
@@ -436,7 +481,7 @@ tbody tr:hover {
 
 @media (max-width: 620px) {
   .shell {
-    width: min(100% - 20px, 1180px);
+    width: min(100% - 20px, 1440px);
     padding-top: 18px;
   }
 
@@ -461,6 +506,14 @@ tbody tr:hover {
   }
 
   .segmented {
+    width: 100%;
+  }
+
+  .category-filter {
+    width: 100%;
+  }
+
+  #new-subscription {
     width: 100%;
   }
 

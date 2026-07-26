@@ -1,7 +1,7 @@
 {
   "name": "vps-value",
   "version": "0.1.0",
-  "description": "A minimal VPS cost tracker for Cloudflare Pages and D1.",
+  "description": "A minimal paid subscription tracker for Cloudflare Pages and D1.",
   "license": "MIT",
   "type": "module",
   "private": false,
