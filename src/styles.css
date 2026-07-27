@@ -690,7 +690,6 @@ tbody tr:hover {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    padding-right: 54px;
   }
 
   .record-count {
@@ -698,7 +697,9 @@ tbody tr:hover {
   }
 
   .list-tools {
-    display: block;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 44px;
+    gap: 8px;
   }
 
   .category-filter {
@@ -709,18 +710,15 @@ tbody tr:hover {
   }
 
   #new-subscription {
-    position: absolute;
-    top: 10px;
-    right: 12px;
-    z-index: 1;
+    position: static;
     width: 44px;
     min-width: 44px;
-    height: 44px;
-    min-height: 44px;
-    border-radius: 50%;
+    height: 42px;
+    min-height: 42px;
+    border-radius: 11px;
     padding: 0;
-    box-shadow: 0 5px 16px rgb(15 23 42 / 18%);
-    font-size: 24px;
+    box-shadow: 0 3px 10px rgb(15 23 42 / 14%);
+    font-size: 22px;
     line-height: 1;
   }
 
@@ -846,70 +844,45 @@ tbody tr:hover {
   }
 
   .subscription-card-actions {
-    gap: 8px;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 5px;
     border-top: 1px solid #edf0f3;
     padding-top: 12px;
   }
 
-  .subscription-card-actions > button {
-    flex: 1 1 0;
-    min-height: 40px;
-    font-size: 14px;
-  }
-
-  .item-menu {
-    position: relative;
-    flex: 0 0 auto;
-  }
-
-  .item-menu summary {
-    width: 42px;
-    min-height: 40px;
-    display: grid;
-    place-items: center;
-    border: 1px solid #cbd3dd;
-    border-radius: 10px;
-    color: #475569;
-    background: #ffffff;
-    cursor: pointer;
-    list-style: none;
-    font-weight: 700;
-  }
-
-  .item-menu summary::-webkit-details-marker {
-    display: none;
-  }
-
-  .item-menu > div {
-    position: absolute;
-    right: 0;
-    bottom: calc(100% + 7px);
-    z-index: 4;
-    width: 150px;
-    display: grid;
-    border: 1px solid #dbe1e8;
-    border-radius: 12px;
-    padding: 6px;
-    background: #ffffff;
-    box-shadow: 0 12px 30px rgb(15 23 42 / 18%);
-  }
-
-  .item-menu a,
-  .item-menu button {
-    min-height: 40px;
+  .subscription-card-actions > button,
+  .subscription-card-actions > a,
+  .subscription-card-actions > span {
+    width: 100%;
+    min-width: 0;
+    min-height: 36px;
     display: flex;
     align-items: center;
-    border: 0;
-    border-radius: 8px;
-    padding: 0 10px;
-    color: #334155;
-    background: transparent;
-    text-decoration: none;
-    font-size: 13px;
+    justify-content: center;
+    border-radius: 9px;
+    padding: 0 3px;
+    font-size: 12px;
+    white-space: nowrap;
   }
 
-  .item-menu .menu-danger {
+  .card-action-link {
+    border: 1px solid #1d2938;
+    color: #ffffff;
+    background: #1d2938;
+    text-decoration: none;
+  }
+
+  .card-action-placeholder {
+    border: 1px solid #d8dee6;
+    color: #a0a9b5;
+    background: #f7f8fa;
+  }
+
+  .subscription-card-actions .compact-danger {
+    border-color: #e3b8b8;
     color: #a23d3d;
+    background: #fff7f7;
   }
 
   .table-state {

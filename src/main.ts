@@ -586,15 +586,10 @@ function renderMobileCard(item: SubscriptionItem): string {
       </div>
 
       <div class="subscription-card-actions">
-        <button class="ghost" type="button" data-action="renew" data-id="${h(item.id)}">续费</button>
+        ${item.vendorUrl ? `<a class="card-action-link" href="${h(item.vendorUrl)}" target="_blank" rel="noreferrer">官网</a>` : `<span class="card-action-placeholder">官网</span>`}
         <button type="button" data-action="edit" data-id="${h(item.id)}">编辑</button>
-        <details class="item-menu">
-          <summary aria-label="${h(item.provider)}的更多操作">•••</summary>
-          <div>
-            ${item.vendorUrl ? `<a href="${h(item.vendorUrl)}" target="_blank" rel="noreferrer">访问官网</a>` : ""}
-            <button class="menu-danger" type="button" data-action="delete" data-id="${h(item.id)}">删除订阅</button>
-          </div>
-        </details>
+        <button class="ghost" type="button" data-action="renew" data-id="${h(item.id)}">续费</button>
+        <button class="compact-danger" type="button" data-action="delete" data-id="${h(item.id)}">删除</button>
       </div>
     </article>
   `;
