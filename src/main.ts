@@ -148,6 +148,7 @@ const state: {
 window.addEventListener("hashchange", () => {
   state.error = "";
   render();
+  window.scrollTo({ top: 0, behavior: "auto" });
 });
 
 void init();
@@ -227,19 +228,27 @@ function renderAuth(): string {
   }
 
   return `
-    <form class="auth-form" id="auth-form">
-      <label for="admin-token">访问令牌</label>
-      <input
-        id="admin-token"
-        name="token"
-        type="password"
-        autocomplete="current-password"
-        value="${h(state.token)}"
-        placeholder="ADMIN_TOKEN"
-      />
-      <button type="submit">保存</button>
-      <button class="ghost" id="clear-token" type="button">清除</button>
-    </form>
+    <details class="auth-panel">
+      <summary>
+        <span class="auth-indicator" aria-hidden="true"></span>
+        ${state.token ? "令牌已保存" : "访问设置"}
+      </summary>
+      <form class="auth-form" id="auth-form">
+        <label for="admin-token">访问令牌</label>
+        <input
+          id="admin-token"
+          name="token"
+          type="password"
+          autocomplete="current-password"
+          value="${h(state.token)}"
+          placeholder="输入 ADMIN_TOKEN"
+        />
+        <div class="auth-actions">
+          <button type="submit">保存</button>
+          <button class="ghost" id="clear-token" type="button">清除</button>
+        </div>
+      </form>
+    </details>
   `;
 }
 
@@ -278,9 +287,11 @@ function renderHomePage(): string {
     <section class="home-page">
       <section class="panel list-panel">
         <div class="panel-heading list-heading">
-          <h2>记录</h2>
+          <div>
+            <h2>订阅记录</h2>
+            <p class="record-count">${state.items.length ? `共 ${state.items.length} 条` : "集中管理续费日期与成本"}</p>
+          </div>
           <div class="list-tools">
-            <button id="new-subscription" type="button">新增</button>
             <select class="category-filter" id="category-filter" aria-label="按分类筛选">
               <option value="">全部分类</option>
               ${state.categories
@@ -293,6 +304,9 @@ function renderHomePage(): string {
                 )
                 .join("")}
             </select>
+            <button id="new-subscription" type="button" aria-label="新增订阅">
+              <span aria-hidden="true">＋</span><span class="new-button-label">新增订阅</span>
+            </button>
           </div>
         </div>
         <div class="list-scroll">
@@ -336,18 +350,13 @@ function renderSummary(): string {
 
   return `
     <section class="summary-grid" aria-label="费用汇总">
-      <article>
-        <span>订阅数量</span>
-        <strong>${summary ? summary.activeQuantity : "-"}</strong>
-        <small>${summary ? `${summary.activeItemCount} 条记录` : "等待加载"}</small>
-      </article>
-      <article>
+      <article class="summary-primary">
         <span>本月需花费</span>
         <strong>${summary ? formatCny(summary.currentMonthDueCny) : "-"}</strong>
         <small>本自然月到期需续费</small>
       </article>
       <article>
-        <span>下月需花费</span>
+        <span>下月续费</span>
         <strong>${summary ? formatCny(summary.nextMonthDueCny) : "-"}</strong>
         <small>下个自然月到期需续费</small>
       </article>
@@ -365,6 +374,11 @@ function renderSummary(): string {
         <span>剩余价值</span>
         <strong>${summary ? formatCny(summary.remainingValueCny) : "-"}</strong>
         <small>按剩余天数自动折算</small>
+      </article>
+      <article>
+        <span>订阅数量</span>
+        <strong>${summary ? summary.activeQuantity : "-"}</strong>
+        <small>${summary ? `${summary.activeItemCount} 条记录` : "等待加载"}</small>
       </article>
     </section>
   `;
@@ -508,7 +522,7 @@ function renderTable(): string {
   }
 
   return `
-    <div class="table-wrap">
+    <div class="table-wrap desktop-table">
       <table>
         <thead>
           <tr>
@@ -529,6 +543,60 @@ function renderTable(): string {
         </tbody>
       </table>
     </div>
+    <div class="mobile-subscription-list" aria-label="订阅记录">
+      ${state.items.map(renderMobileCard).join("")}
+    </div>
+  `;
+}
+
+function renderMobileCard(item: SubscriptionItem): string {
+  const expiryClass = getExpiryClass(item.expiresInDays);
+
+  return `
+    <article class="subscription-card">
+      <div class="subscription-card-head">
+        <div class="subscription-name">
+          <strong>${h(item.provider)}</strong>
+          <span>${h(item.planName)}</span>
+        </div>
+        ${renderSubscriptionStatus(item.expiresInDays)}
+      </div>
+
+      <div class="subscription-card-price">
+        <strong>${formatMoney(item.price, item.currency)}</strong>
+        <span>${h(formatCycle(item.cycleCount, item.cycleUnit))}付${item.quantity > 1 ? ` · ${item.quantity} 份` : ""}</span>
+      </div>
+
+      <div class="subscription-card-meta">
+        <div>
+          <span>到期</span>
+          <strong class="expiry ${expiryClass}">${h(formatExpiry(item.expiresInDays))}</strong>
+          <small>${h(item.expiresAt)}</small>
+        </div>
+        <div>
+          <span>月均</span>
+          <strong>${formatMaybeCny(item.costs.monthlyCny)}</strong>
+          <small>剩余 ${formatMaybeCny(item.costs.remainingValueCny)}</small>
+        </div>
+      </div>
+
+      <div class="subscription-card-tags">
+        <span>${h(item.category)}</span>
+        ${item.note ? `<span class="card-note">${h(item.note)}</span>` : ""}
+      </div>
+
+      <div class="subscription-card-actions">
+        <button class="ghost" type="button" data-action="renew" data-id="${h(item.id)}">续费</button>
+        <button type="button" data-action="edit" data-id="${h(item.id)}">编辑</button>
+        <details class="item-menu">
+          <summary aria-label="${h(item.provider)}的更多操作">•••</summary>
+          <div>
+            ${item.vendorUrl ? `<a href="${h(item.vendorUrl)}" target="_blank" rel="noreferrer">访问官网</a>` : ""}
+            <button class="menu-danger" type="button" data-action="delete" data-id="${h(item.id)}">删除订阅</button>
+          </div>
+        </details>
+      </div>
+    </article>
   `;
 }
 
@@ -617,6 +685,8 @@ function navigateHome(shouldRender = true): void {
   if (shouldRender) {
     render();
   }
+
+  window.scrollTo({ top: 0, behavior: "auto" });
 }
 
 function bindEvents(): void {
