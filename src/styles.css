@@ -62,6 +62,17 @@ button.small,
   font-size: 17px;
 }
 
+.link-button.is-disabled {
+  border-color: #d4dae1;
+  color: #929dab;
+  background: #eef1f4;
+  cursor: not-allowed;
+}
+
+.link-button.is-disabled:hover {
+  background: #eef1f4;
+}
+
 button.danger {
   border-color: #a23d3d;
   background: #a23d3d;
@@ -512,7 +523,8 @@ tbody tr:hover {
   min-width: 76px;
 }
 
-.row-actions button {
+.row-actions button,
+.row-actions .link-button {
   font-size: 15px;
 }
 

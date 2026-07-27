@@ -586,7 +586,7 @@ function renderMobileCard(item: SubscriptionItem): string {
       </div>
 
       <div class="subscription-card-actions">
-        ${item.vendorUrl ? `<a class="card-action-link" href="${h(item.vendorUrl)}" target="_blank" rel="noreferrer">官网</a>` : `<span class="card-action-placeholder">官网</span>`}
+        ${item.vendorUrl ? `<a class="card-action-link" href="${h(item.vendorUrl)}" target="_blank" rel="noreferrer">官网</a>` : `<span class="card-action-placeholder" aria-disabled="true">官网</span>`}
         <button type="button" data-action="edit" data-id="${h(item.id)}">编辑</button>
         <button class="ghost" type="button" data-action="renew" data-id="${h(item.id)}">续费</button>
         <button class="compact-danger" type="button" data-action="delete" data-id="${h(item.id)}">删除</button>
@@ -631,7 +631,11 @@ function renderRow(item: SubscriptionItem): string {
       <td>${item.note ? h(item.note) : "-"}</td>
       <td>
         <div class="row-actions">
-          ${item.vendorUrl ? `<a class="link-button" href="${h(item.vendorUrl)}" target="_blank" rel="noreferrer">官网</a>` : ""}
+          ${
+            item.vendorUrl
+              ? `<a class="link-button" href="${h(item.vendorUrl)}" target="_blank" rel="noreferrer">官网</a>`
+              : `<span class="link-button is-disabled" aria-disabled="true">官网</span>`
+          }
           <button class="small" type="button" data-action="edit" data-id="${h(item.id)}">编辑</button>
           <button class="small" type="button" data-action="renew" data-id="${h(item.id)}">续费</button>
           <button class="small danger" type="button" data-action="delete" data-id="${h(item.id)}">删除</button>
