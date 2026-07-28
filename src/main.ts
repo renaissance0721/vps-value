@@ -79,6 +79,7 @@ const app = appRoot;
 const tokenStorageKey = "vps-value-admin-token";
 const currentSpendPeriodStorageKey = "vps-value-current-spend-period";
 const nextSpendPeriodStorageKey = "vps-value-next-spend-period";
+const averageCostPeriodStorageKey = "vps-value-average-cost-period";
 type SpendPeriod = "month" | "year";
 
 function readSpendPeriod(storageKey: string): SpendPeriod {
@@ -142,6 +143,7 @@ const state: {
   editingId: string | null;
   currentSpendPeriod: SpendPeriod;
   nextSpendPeriod: SpendPeriod;
+  averageCostPeriod: SpendPeriod;
 } = {
   token: localStorage.getItem(tokenStorageKey) ?? "",
   authRequired: true,
@@ -156,7 +158,8 @@ const state: {
   notice: "",
   editingId: null,
   currentSpendPeriod: readSpendPeriod(currentSpendPeriodStorageKey),
-  nextSpendPeriod: readSpendPeriod(nextSpendPeriodStorageKey)
+  nextSpendPeriod: readSpendPeriod(nextSpendPeriodStorageKey),
+  averageCostPeriod: readSpendPeriod(averageCostPeriodStorageKey)
 };
 
 window.addEventListener("hashchange", () => {
@@ -363,37 +366,34 @@ function renderSummary(): string {
   const summary = state.summary;
   const currentIsYear = state.currentSpendPeriod === "year";
   const nextIsYear = state.nextSpendPeriod === "year";
+  const averageIsYear = state.averageCostPeriod === "year";
   const currentValue = currentIsYear ? summary?.currentYearDueCny : summary?.currentMonthDueCny;
   const nextValue = nextIsYear ? summary?.nextYearDueCny : summary?.nextMonthDueCny;
+  const averageValue = averageIsYear ? summary?.annualCny : summary?.monthlyCny;
 
   return `
     <section class="summary-grid" aria-label="费用汇总">
       <article class="summary-primary summary-spend-card">
-        ${renderSpendPeriodSwitch("current", state.currentSpendPeriod, "本月", "今年")}
+        ${renderSummaryPeriodSwitch("current", state.currentSpendPeriod, "本月需花费", "今年需花费")}
         <strong>${currentValue === undefined ? "-" : formatCny(currentValue)}</strong>
         <small>${currentIsYear ? "本自然年到期需续费" : "本自然月到期需续费"}</small>
       </article>
       <article class="summary-spend-card">
-        ${renderSpendPeriodSwitch("next", state.nextSpendPeriod, "下月", "明年")}
+        ${renderSummaryPeriodSwitch("next", state.nextSpendPeriod, "下月需花费", "明年需花费")}
         <strong>${nextValue === undefined ? "-" : formatCny(nextValue)}</strong>
         <small>${nextIsYear ? "下一自然年到期需续费" : "下个自然月到期需续费"}</small>
       </article>
-      <article>
-        <span>月均成本</span>
-        <strong>${summary ? formatCny(summary.monthlyCny) : "-"}</strong>
-        <small>统一折算为 CNY</small>
+      <article class="summary-average-card">
+        ${renderSummaryPeriodSwitch("average", state.averageCostPeriod, "月均成本", "年均成本")}
+        <strong>${averageValue === undefined ? "-" : formatCny(averageValue)}</strong>
+        <small>${averageIsYear ? formatRateTime(state.rates?.updatedAt) : "按周期统一折算为 CNY"}</small>
       </article>
-      <article>
-        <span>年均成本</span>
-        <strong>${summary ? formatCny(summary.annualCny) : "-"}</strong>
-        <small>${formatRateTime(state.rates?.updatedAt)}</small>
-      </article>
-      <article>
+      <article class="summary-remaining-card">
         <span>剩余价值</span>
         <strong>${summary ? formatCny(summary.remainingValueCny) : "-"}</strong>
         <small>按剩余天数自动折算</small>
       </article>
-      <article>
+      <article class="summary-count-card">
         <span>订阅数量</span>
         <strong>${summary ? summary.activeQuantity : "-"}</strong>
         <small>${summary ? `${summary.activeItemCount} 条记录` : "等待加载"}</small>
@@ -402,30 +402,34 @@ function renderSummary(): string {
   `;
 }
 
-function renderSpendPeriodSwitch(
-  slot: "current" | "next",
+function renderSummaryPeriodSwitch(
+  slot: "current" | "next" | "average",
   selectedPeriod: SpendPeriod,
   monthLabel: string,
   yearLabel: string
 ): string {
-  const label = slot === "current" ? "当前花费统计周期" : "后续花费统计周期";
+  const labels = {
+    current: "当前花费统计周期",
+    next: "后续花费统计周期",
+    average: "平均成本统计周期"
+  };
 
   return `
-    <div class="period-switch" role="group" aria-label="${label}">
+    <div class="period-switch" role="group" aria-label="${labels[slot]}">
       <button
         type="button"
         class="${selectedPeriod === "month" ? "is-selected" : ""}"
-        data-spend-slot="${slot}"
-        data-spend-period="month"
+        data-summary-slot="${slot}"
+        data-summary-period="month"
         aria-pressed="${selectedPeriod === "month"}"
-      >${monthLabel}需花费</button>
+      >${monthLabel}</button>
       <button
         type="button"
         class="${selectedPeriod === "year" ? "is-selected" : ""}"
-        data-spend-slot="${slot}"
-        data-spend-period="year"
+        data-summary-slot="${slot}"
+        data-summary-period="year"
         aria-pressed="${selectedPeriod === "year"}"
-      >${yearLabel}需花费</button>
+      >${yearLabel}</button>
     </div>
   `;
 }
@@ -735,16 +739,19 @@ function navigateHome(shouldRender = true): void {
 }
 
 function bindEvents(): void {
-  document.querySelectorAll<HTMLButtonElement>("[data-spend-slot][data-spend-period]").forEach((button) => {
+  document.querySelectorAll<HTMLButtonElement>("[data-summary-slot][data-summary-period]").forEach((button) => {
     button.addEventListener("click", () => {
-      const period: SpendPeriod = button.dataset.spendPeriod === "year" ? "year" : "month";
+      const period: SpendPeriod = button.dataset.summaryPeriod === "year" ? "year" : "month";
 
-      if (button.dataset.spendSlot === "current") {
+      if (button.dataset.summarySlot === "current") {
         state.currentSpendPeriod = period;
         localStorage.setItem(currentSpendPeriodStorageKey, period);
-      } else {
+      } else if (button.dataset.summarySlot === "next") {
         state.nextSpendPeriod = period;
         localStorage.setItem(nextSpendPeriodStorageKey, period);
+      } else {
+        state.averageCostPeriod = period;
+        localStorage.setItem(averageCostPeriodStorageKey, period);
       }
 
       render();
