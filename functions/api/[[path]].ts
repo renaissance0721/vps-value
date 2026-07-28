@@ -492,6 +492,8 @@ function summarize(items: ReturnType<typeof toDto>[]) {
   let cycleCny = 0;
   let currentMonthDueCny = 0;
   let nextMonthDueCny = 0;
+  let currentYearDueCny = 0;
+  let nextYearDueCny = 0;
   let monthlyCny = 0;
   let annualCny = 0;
   let remainingValueCny = 0;
@@ -512,6 +514,12 @@ function summarize(items: ReturnType<typeof toDto>[]) {
     if (isDueInNextMonth(item.expiresAt)) {
       nextMonthDueCny += item.costs.cycleCny;
     }
+    if (isDueInCurrentYear(item.expiresAt)) {
+      currentYearDueCny += item.costs.cycleCny;
+    }
+    if (isDueInNextYear(item.expiresAt)) {
+      nextYearDueCny += item.costs.cycleCny;
+    }
     monthlyCny += item.costs.monthlyCny;
     annualCny += item.costs.annualCny;
     remainingValueCny += item.costs.remainingValueCny ?? 0;
@@ -523,6 +531,8 @@ function summarize(items: ReturnType<typeof toDto>[]) {
     cycleCny: roundMoney(cycleCny),
     currentMonthDueCny: roundMoney(currentMonthDueCny),
     nextMonthDueCny: roundMoney(nextMonthDueCny),
+    currentYearDueCny: roundMoney(currentYearDueCny),
+    nextYearDueCny: roundMoney(nextYearDueCny),
     monthlyCny: roundMoney(monthlyCny),
     annualCny: roundMoney(annualCny),
     remainingValueCny: roundMoney(remainingValueCny),
@@ -675,6 +685,16 @@ function isDueInNextMonth(dateOnly: string): boolean {
     date.getUTCFullYear() === nextMonth.getUTCFullYear() &&
     date.getUTCMonth() === nextMonth.getUTCMonth()
   );
+}
+
+function isDueInCurrentYear(dateOnly: string): boolean {
+  const now = new Date();
+  return parseDateOnly(dateOnly).getUTCFullYear() === now.getUTCFullYear();
+}
+
+function isDueInNextYear(dateOnly: string): boolean {
+  const now = new Date();
+  return parseDateOnly(dateOnly).getUTCFullYear() === now.getUTCFullYear() + 1;
 }
 
 function addCycle(dateOnly: string, count: number, unit: CycleUnit): string {

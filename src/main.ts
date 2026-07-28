@@ -37,6 +37,8 @@ interface Summary {
   cycleCny: number;
   currentMonthDueCny: number;
   nextMonthDueCny: number;
+  currentYearDueCny: number;
+  nextYearDueCny: number;
   monthlyCny: number;
   annualCny: number;
   remainingValueCny: number;
@@ -75,6 +77,14 @@ if (!appRoot) {
 const app = appRoot;
 
 const tokenStorageKey = "vps-value-admin-token";
+const currentSpendPeriodStorageKey = "vps-value-current-spend-period";
+const nextSpendPeriodStorageKey = "vps-value-next-spend-period";
+type SpendPeriod = "month" | "year";
+
+function readSpendPeriod(storageKey: string): SpendPeriod {
+  return localStorage.getItem(storageKey) === "year" ? "year" : "month";
+}
+
 const currencyOptions = [
   "CNY",
   "USD",
@@ -130,6 +140,8 @@ const state: {
   error: string;
   notice: string;
   editingId: string | null;
+  currentSpendPeriod: SpendPeriod;
+  nextSpendPeriod: SpendPeriod;
 } = {
   token: localStorage.getItem(tokenStorageKey) ?? "",
   authRequired: true,
@@ -142,7 +154,9 @@ const state: {
   loading: false,
   error: "",
   notice: "",
-  editingId: null
+  editingId: null,
+  currentSpendPeriod: readSpendPeriod(currentSpendPeriodStorageKey),
+  nextSpendPeriod: readSpendPeriod(nextSpendPeriodStorageKey)
 };
 
 window.addEventListener("hashchange", () => {
@@ -347,18 +361,22 @@ function renderFormPage(item: SubscriptionItem | null, id: string | null): strin
 
 function renderSummary(): string {
   const summary = state.summary;
+  const currentIsYear = state.currentSpendPeriod === "year";
+  const nextIsYear = state.nextSpendPeriod === "year";
+  const currentValue = currentIsYear ? summary?.currentYearDueCny : summary?.currentMonthDueCny;
+  const nextValue = nextIsYear ? summary?.nextYearDueCny : summary?.nextMonthDueCny;
 
   return `
     <section class="summary-grid" aria-label="费用汇总">
-      <article class="summary-primary">
-        <span>本月需花费</span>
-        <strong>${summary ? formatCny(summary.currentMonthDueCny) : "-"}</strong>
-        <small>本自然月到期需续费</small>
+      <article class="summary-primary summary-spend-card">
+        ${renderSpendPeriodSwitch("current", state.currentSpendPeriod, "本月", "今年")}
+        <strong>${currentValue === undefined ? "-" : formatCny(currentValue)}</strong>
+        <small>${currentIsYear ? "本自然年到期需续费" : "本自然月到期需续费"}</small>
       </article>
-      <article>
-        <span>下月续费</span>
-        <strong>${summary ? formatCny(summary.nextMonthDueCny) : "-"}</strong>
-        <small>下个自然月到期需续费</small>
+      <article class="summary-spend-card">
+        ${renderSpendPeriodSwitch("next", state.nextSpendPeriod, "下月", "明年")}
+        <strong>${nextValue === undefined ? "-" : formatCny(nextValue)}</strong>
+        <small>${nextIsYear ? "下一自然年到期需续费" : "下个自然月到期需续费"}</small>
       </article>
       <article>
         <span>月均成本</span>
@@ -381,6 +399,34 @@ function renderSummary(): string {
         <small>${summary ? `${summary.activeItemCount} 条记录` : "等待加载"}</small>
       </article>
     </section>
+  `;
+}
+
+function renderSpendPeriodSwitch(
+  slot: "current" | "next",
+  selectedPeriod: SpendPeriod,
+  monthLabel: string,
+  yearLabel: string
+): string {
+  const label = slot === "current" ? "当前花费统计周期" : "后续花费统计周期";
+
+  return `
+    <div class="period-switch" role="group" aria-label="${label}">
+      <button
+        type="button"
+        class="${selectedPeriod === "month" ? "is-selected" : ""}"
+        data-spend-slot="${slot}"
+        data-spend-period="month"
+        aria-pressed="${selectedPeriod === "month"}"
+      >${monthLabel}需花费</button>
+      <button
+        type="button"
+        class="${selectedPeriod === "year" ? "is-selected" : ""}"
+        data-spend-slot="${slot}"
+        data-spend-period="year"
+        aria-pressed="${selectedPeriod === "year"}"
+      >${yearLabel}需花费</button>
+    </div>
   `;
 }
 
@@ -689,6 +735,22 @@ function navigateHome(shouldRender = true): void {
 }
 
 function bindEvents(): void {
+  document.querySelectorAll<HTMLButtonElement>("[data-spend-slot][data-spend-period]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const period: SpendPeriod = button.dataset.spendPeriod === "year" ? "year" : "month";
+
+      if (button.dataset.spendSlot === "current") {
+        state.currentSpendPeriod = period;
+        localStorage.setItem(currentSpendPeriodStorageKey, period);
+      } else {
+        state.nextSpendPeriod = period;
+        localStorage.setItem(nextSpendPeriodStorageKey, period);
+      }
+
+      render();
+    });
+  });
+
   document.querySelector<HTMLButtonElement>("#new-subscription")?.addEventListener("click", () => {
     navigateToForm(null);
   });

@@ -260,6 +260,52 @@ a {
   padding: 16px;
 }
 
+.summary-spend-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.period-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+  width: 100%;
+  border: 1px solid #dce2e8;
+  border-radius: 9px;
+  padding: 3px;
+  background: #f1f4f7;
+}
+
+.period-switch button {
+  min-width: 0;
+  min-height: 28px;
+  border: 0;
+  border-radius: 6px;
+  padding: 0 5px;
+  color: #687583;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.period-switch button:hover {
+  color: #273444;
+  background: #e5eaf0;
+}
+
+.period-switch button.is-selected {
+  color: #18202a;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 12%);
+}
+
+.period-switch button:focus-visible {
+  outline-width: 2px;
+  outline-offset: 1px;
+}
+
 .summary-grid span,
 .summary-grid small {
   display: block;
@@ -626,6 +672,35 @@ tbody tr:hover {
     color: #ffffff;
     border-color: #1d2938;
     background: #1d2938;
+  }
+
+  .period-switch {
+    align-self: flex-start;
+    width: min(100%, 246px);
+  }
+
+  .summary-grid article:not(.summary-primary) .period-switch button {
+    padding-inline: 3px;
+    font-size: 11px;
+  }
+
+  .summary-grid .summary-primary .period-switch {
+    border-color: #415064;
+    background: #111a27;
+  }
+
+  .summary-grid .summary-primary .period-switch button {
+    color: #aeb9c8;
+  }
+
+  .summary-grid .summary-primary .period-switch button:hover {
+    color: #ffffff;
+    background: #263448;
+  }
+
+  .summary-grid .summary-primary .period-switch button.is-selected {
+    color: #16202d;
+    background: #ffffff;
   }
 
   .summary-grid .summary-primary span,
