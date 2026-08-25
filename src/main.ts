@@ -192,10 +192,11 @@ async function loadItems(): Promise<void> {
   render();
 
   try {
-    const query = state.categoryFilter
-      ? `?category=${encodeURIComponent(state.categoryFilter)}`
-      : "";
-    const data = await apiFetch<ListResponse>(`/api/subscriptions${query}`);
+    const query = new URLSearchParams({ today: toDateInputValue(new Date()) });
+    if (state.categoryFilter) {
+      query.set("category", state.categoryFilter);
+    }
+    const data = await apiFetch<ListResponse>(`/api/subscriptions?${query.toString()}`);
     state.items = data.items;
     state.summary = data.summary;
     state.categories = data.categories;
@@ -376,12 +377,12 @@ function renderSummary(): string {
       <article class="summary-primary summary-spend-card">
         ${renderSummaryPeriodSwitch("current", state.currentSpendPeriod, "本月需花费", "今年需花费")}
         <strong>${currentValue === undefined ? "-" : formatCny(currentValue)}</strong>
-        <small>${currentIsYear ? "本自然年到期需续费" : "本自然月到期需续费"}</small>
+        <small>${currentIsYear ? "按周期推算本自然年全部续费" : "按周期推算本自然月全部续费"}</small>
       </article>
       <article class="summary-spend-card">
         ${renderSummaryPeriodSwitch("next", state.nextSpendPeriod, "下月需花费", "明年需花费")}
         <strong>${nextValue === undefined ? "-" : formatCny(nextValue)}</strong>
-        <small>${nextIsYear ? "下一自然年到期需续费" : "下个自然月到期需续费"}</small>
+        <small>${nextIsYear ? "按周期推算下一自然年全部续费" : "按周期推算下个自然月全部续费"}</small>
       </article>
       <article class="summary-average-card">
         ${renderSummaryPeriodSwitch("average", state.averageCostPeriod, "月均成本", "年均成本")}

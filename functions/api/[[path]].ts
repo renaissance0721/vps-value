@@ -1,9 +1,15 @@
+import {
+  addCycle,
+  calculateRecurringDue,
+  getBillingPeriods,
+  type CycleUnit
+} from "../billing";
+
 interface Env {
   DB: D1Database;
   ADMIN_TOKEN?: string;
 }
 
-type CycleUnit = "day" | "month" | "year";
 type SubscriptionStatus = "active" | "inactive";
 
 interface SubscriptionRow {
@@ -132,7 +138,11 @@ async function handleSubscriptions(request: Request, env: Env, parts: string[]):
     if (request.method === "GET") {
       const url = new URL(request.url);
       const category = url.searchParams.get("category")?.trim() ?? "";
-      return listSubscriptions(env, category);
+      const todayDateOnly = url.searchParams.get("today")?.trim() || toDateOnly(new Date());
+      if (!isValidDateOnly(todayDateOnly)) {
+        throw new ApiError(400, "invalid_date", "统计日期必须是有效的 YYYY-MM-DD");
+      }
+      return listSubscriptions(env, category, todayDateOnly);
     }
 
     if (request.method === "POST") {
@@ -253,7 +263,11 @@ async function handleSubscriptions(request: Request, env: Env, parts: string[]):
   throw new ApiError(405, "method_not_allowed", "请求方法不支持");
 }
 
-async function listSubscriptions(env: Env, category: string): Promise<Response> {
+async function listSubscriptions(
+  env: Env,
+  category: string,
+  todayDateOnly: string
+): Promise<Response> {
   const rates = await getRates();
   const rows = category
     ? (
@@ -281,7 +295,7 @@ async function listSubscriptions(env: Env, category: string): Promise<Response> 
 
   return json({
     items,
-    summary: summarize(items),
+    summary: summarize(items, todayDateOnly),
     categories: (categoryRows.results ?? []).map((row) => row.category),
     rates
   });
@@ -485,9 +499,10 @@ function toDto(row: SubscriptionRow, rates: Rates) {
   };
 }
 
-function summarize(items: ReturnType<typeof toDto>[]) {
+function summarize(items: ReturnType<typeof toDto>[], todayDateOnly: string) {
   const activeItems = items.filter((item) => item.status === "active");
   const unknownCurrencies = new Set<string>();
+  const billingPeriods = getBillingPeriods(todayDateOnly);
 
   let cycleCny = 0;
   let currentMonthDueCny = 0;
@@ -508,18 +523,34 @@ function summarize(items: ReturnType<typeof toDto>[]) {
     }
 
     cycleCny += item.costs.cycleCny;
-    if (isDueInCurrentMonth(item.expiresAt)) {
-      currentMonthDueCny += item.costs.cycleCny;
-    }
-    if (isDueInNextMonth(item.expiresAt)) {
-      nextMonthDueCny += item.costs.cycleCny;
-    }
-    if (isDueInCurrentYear(item.expiresAt)) {
-      currentYearDueCny += item.costs.cycleCny;
-    }
-    if (isDueInNextYear(item.expiresAt)) {
-      nextYearDueCny += item.costs.cycleCny;
-    }
+    currentMonthDueCny += calculateRecurringDue(
+      item.costs.cycleCny,
+      item.expiresAt,
+      item.cycleCount,
+      item.cycleUnit,
+      billingPeriods.currentMonth
+    );
+    nextMonthDueCny += calculateRecurringDue(
+      item.costs.cycleCny,
+      item.expiresAt,
+      item.cycleCount,
+      item.cycleUnit,
+      billingPeriods.nextMonth
+    );
+    currentYearDueCny += calculateRecurringDue(
+      item.costs.cycleCny,
+      item.expiresAt,
+      item.cycleCount,
+      item.cycleUnit,
+      billingPeriods.currentYear
+    );
+    nextYearDueCny += calculateRecurringDue(
+      item.costs.cycleCny,
+      item.expiresAt,
+      item.cycleCount,
+      item.cycleUnit,
+      billingPeriods.nextYear
+    );
     monthlyCny += item.costs.monthlyCny;
     annualCny += item.costs.annualCny;
     remainingValueCny += item.costs.remainingValueCny ?? 0;
@@ -664,61 +695,6 @@ function calculateRemainingValue(
   }
 
   return roundMoney((cycleCny / cycleDays) * remainingDays);
-}
-
-function isDueInCurrentMonth(dateOnly: string): boolean {
-  const now = new Date();
-  const date = parseDateOnly(dateOnly);
-
-  return (
-    date.getUTCFullYear() === now.getUTCFullYear() &&
-    date.getUTCMonth() === now.getUTCMonth()
-  );
-}
-
-function isDueInNextMonth(dateOnly: string): boolean {
-  const now = new Date();
-  const date = parseDateOnly(dateOnly);
-  const nextMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
-
-  return (
-    date.getUTCFullYear() === nextMonth.getUTCFullYear() &&
-    date.getUTCMonth() === nextMonth.getUTCMonth()
-  );
-}
-
-function isDueInCurrentYear(dateOnly: string): boolean {
-  const now = new Date();
-  return parseDateOnly(dateOnly).getUTCFullYear() === now.getUTCFullYear();
-}
-
-function isDueInNextYear(dateOnly: string): boolean {
-  const now = new Date();
-  return parseDateOnly(dateOnly).getUTCFullYear() === now.getUTCFullYear() + 1;
-}
-
-function addCycle(dateOnly: string, count: number, unit: CycleUnit): string {
-  if (unit === "day") {
-    const date = parseDateOnly(dateOnly);
-    date.setUTCDate(date.getUTCDate() + count);
-    return toDateOnly(date);
-  }
-
-  return addMonths(dateOnly, unit === "month" ? count : count * 12);
-}
-
-function addMonths(dateOnly: string, months: number): string {
-  const [year, month, day] = dateOnly.split("-").map(Number);
-  const targetMonthIndex = month - 1 + months;
-  const targetYear = year + Math.floor(targetMonthIndex / 12);
-  const normalizedMonthIndex = ((targetMonthIndex % 12) + 12) % 12;
-  const targetMonth = normalizedMonthIndex + 1;
-  const maxDay = daysInMonth(targetYear, targetMonth);
-  return toDateOnly(new Date(Date.UTC(targetYear, normalizedMonthIndex, Math.min(day, maxDay))));
-}
-
-function daysInMonth(year: number, month: number): number {
-  return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
 function getDaysUntil(dateOnly: string): number {
